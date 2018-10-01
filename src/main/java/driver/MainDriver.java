@@ -5,9 +5,13 @@ import org.openqa.selenium.*;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeDriverService;
 import org.openqa.selenium.chrome.ChromeOptions;
+import org.openqa.selenium.interactions.Actions;
+import org.openqa.selenium.logging.LogEntries;
+import org.openqa.selenium.logging.LogType;
 import org.openqa.selenium.remote.LocalFileDetector;
 import org.openqa.selenium.remote.ProtocolHandshake;
 import org.openqa.selenium.remote.RemoteWebDriver;
+import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -16,6 +20,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import static io.github.bonigarcia.wdm.DriverManagerType.CHROME;
 
 public class MainDriver implements WebDriver, TakesScreenshot {
     /**
@@ -123,7 +128,7 @@ public class MainDriver implements WebDriver, TakesScreenshot {
             debugStatus = Boolean.parseBoolean(status);
         }
         if (debugStatus) {
-            ChromeDriverManager.getInstance().setup();
+            ChromeDriverManager.getInstance(CHROME).setup();
         }
         return debugStatus;
     }
@@ -221,5 +226,93 @@ public class MainDriver implements WebDriver, TakesScreenshot {
     @Override
     public <X> X getScreenshotAs(OutputType<X> target) throws WebDriverException {
         return ((TakesScreenshot) driver).getScreenshotAs(target);
+    }
+
+    public Object executeScript(String arg0, Object... arg1) {
+        return ((JavascriptExecutor) driver).executeScript(arg0, arg1);
+    }
+
+    /******************* Дополнительные методы ***********************/
+
+    /**
+     * Вставка текста в видимое поле для текста
+     *
+     * @param locator Локатор поля для ввода текста
+     * @param text    Текст для вставки
+     */
+    public void enterTextToField(By locator, String text) {
+        WebElement element = wait.until(ExpectedConditions.visibilityOfElementLocated(locator));
+        element.clear();
+        element.sendKeys(text);
+    }
+
+    /**
+     * Виден ли элемент
+     *
+     * @param locator Локатор элемента
+     * @return true - виден, false - нет
+     */
+    public boolean isElementVisible(By locator) {
+        int i = 0;
+        do {
+            try {
+                return findElement(locator).isDisplayed();
+            } catch (NoSuchElementException e) {
+                return false;
+            } catch (StaleElementReferenceException e) {
+            }
+        } while (i++ < 5);
+        throw new StaleElementReferenceException("Can't validate element after " + i + " tries");
+    }
+
+    /**
+     * Установка обычного чекбокса в нужное положение
+     *
+     * @param locator      Локатор самого инпута чекбокса
+     * @param neededStatus Необходимый статус чекбокса
+     */
+    public void setCheckBoxStatus(By locator, boolean neededStatus) {
+        WebElement checkBox = findElement(locator);
+        if (checkBox.isSelected() != neededStatus) {
+            checkBox.click();
+        }
+    }
+
+    /**
+     * Установка графически отрисованного чекбокса в нужное положение
+     *
+     * @param locator        Локатор самого инпута чекбокса
+     * @param graphicLocator Локатор графического элемента для чекбокса
+     * @param neededStatus   Необходимый статус чекбокса
+     */
+    public void setGraphicCheckBoxStatus(By locator, By graphicLocator, boolean neededStatus) {
+        WebElement checkBox = findElement(locator);
+        int i = 0;
+        while ((checkBox.isSelected() != neededStatus) && (i++ < 2)) {
+            checkBox.findElement(graphicLocator).click();
+        }
+    }
+
+    /**
+     * Медленный ввод текста в поле
+     */
+    public void lazyEnterTextToField(By locator, String text) {
+        WebElement element = wait.until(ExpectedConditions.visibilityOfElementLocated(locator));
+        element.clear();
+        for (char c : text.toCharArray()) {
+            element.sendKeys(String.valueOf(c));
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+            }
+        }
+    }
+
+    /**
+     *  Возвращает лог из консоли браузера актуальный на момент вызова
+     *  Вывод всего лога: for (LogEntry entry : getDriver().analyzeLog()) {System.out.println(new Date(entry.getTimestamp()) + " " + entry.getLevel() + " " + entry.getMessage());}
+     */
+    public LogEntries analyzeLog() {
+        return driver.manage().logs().get(LogType.BROWSER);
     }
 }
